@@ -1,7 +1,7 @@
 ---
-title: "第一次作业你的报告题目"
+title: "武汉2023年链家二手房数据分析"
 CJKmainfont: Songti SC
-author: "your name"
+author: "邵瑞瑞"
 date: "`r Sys.Date()`"
 output:
   pdf_document:
@@ -17,9 +17,20 @@ output:
     theme: cosmo
     toc: yes
 ---
+
+
+
+
 ```{r setup, include = FALSE,echo = FALSE}
-knitr::opts_chunk$set(echo = FALSE,error = FALSE, warning = FALSE, message = FALSE,
-                      out.width = "100%", split = FALSE, fig.align = "center")
+knitr::opts_chunk$set(
+	echo = FALSE,
+	error = FALSE,
+	fig.align = "center",
+	message = FALSE,
+	warning = FALSE,
+	out.width = "100%",
+	split = FALSE
+)
 #load library
 library(tidyverse)
 library(kableExtra)
@@ -28,18 +39,28 @@ library(scales)
 library(plotly)
 library(patchwork)
 library(ggrepel)
+library(ggplot2)
 ```
+
+```{r knitr, echo=FALSE}
+library(knitr)
+```
+
 
 # 你的主要发现
 
-1. 发现1
 
-1. 发现2
-  
-1. 发现3
-    
+1.武汉总体总价集中在较低的范围（约120万），这可能与武汉相较于一线城市（如北京、上海、广州和深圳）人均GDP（经济水平）仍有一定差距有关，潜在买家可能更多地关注中低价位的房源
+
+2.武汉在售小区数量前10的区域主要集中在郊区，位置偏远。
+
+3.武汉二手房中7-30的中高层房源占比最高；其次是30层以上的超高层，占比接近中高层数量；7层以下房源较少，不足9%。
+楼层处在10-20层之间的平均单价低于10层以下和20层以上的房屋单价平均水平，资金有限、追求性价比的买房人群更适宜选择层高10-20的楼房
+
+
 
 # 数据介绍
+
 
 本报告**链家**数据获取方式如下：
     
@@ -50,105 +71,200 @@ library(ggrepel)
 - 数据包括了页面可见部分的文本信息，具体字段及说明见作业说明。
 
  **说明：**数据仅用于教学；由于不清楚链家数据的展示规则，因此数据可能并不是武汉二手房市场的随机抽样，结论很可能有很大的偏差，甚至可能是错误的。
-    
-```{r}
-# 载入数据和预处理
+ 
 
-lj<- read_csv("/Users/jameschen/Documents/02_Teaching/12_quantitative_thinking_R/data/2023-09-12_cleaned.csv")
-# EDA ---------------------------------------------------------------------
-
-## 如下语句可以解决画图中的中文显示问题，当然你可以用showtext包来解决
-
-theme_set(theme(text = element_text(family="Songti SC",size = 10))) #这里family设置成你系统中的中文字体名。
-
-# 做一些数据预处理，比如把字符型变成factor。
-
+```{r read, echo=FALSE}
+lj<- read_csv("D:/武汉大学/商务经济统计/作业1/作业相关内容/lj.csv")
+theme_set(theme(text = element_text(family="Songti SC",size = 10))) 
 ```
+
+```{r asfactor, echo=FALSE}
+lj <- lj %>%
+  mutate(across(where(is.character), as.factor))
+```
+
 
 # 数据概览
 
 数据表（lj)共包括`r names(lj)`等`r ncol(lj)`个变量,共`r nrow(lj)`行。表的前10行示例如下：
+```{r data, echo=FALSE}
+names <- names(lj)
+print(names)
+ncols <- ncol(lj)
+print(ncols)
+nrows <- nrow(lj)
+print(nrows)
+```
 
-```{r}
+```{r head, echo=FALSE}
 lj %>% 
   head(10) %>%
   kable(caption = "武汉链家二手房") %>% 
-  kable_styling()
+  kable_styling(full_width = FALSE, position = "left")
 ```
 
-各变量的简短信息：
-```{r}
+
+```{r glimp, echo=FALSE}
 glimpse(lj)
 ```
-
-各变量的简短统计：
-```{r}
+```{r sum, echo=FALSE}
 summary(lj)
 ```
 
-可以看到：
-
-- 直观结论1
-
-- 直观结论2
-
-- ...
+# 可以看到：
+- 直观结论1：该网站从多个维度展示房屋信息，共计18个维度（变量）；分别是小区名字、所处区域、房屋总价、房屋单价、房间数、客厅数、建筑面积、房屋主要朝向、房屋次要朝向、装修状况、楼栋总层数、房屋在所在楼栋所处位置、建筑形式、在该二手房网站的关注人数、是否靠近地铁、产证是否满2年、中介是否有钥匙、是否支持VR看房
+- 直观结论2：武汉二手房总价从10.6万-1380.0万不等，总价均值是155.9万
+- 直观结论3：武汉二手房单价从1771元-44656元不等，单价均值在15148元
+- 直观结论3：50%房源为95.5平，3室两厅
+- 直观结论4：房屋总层高从2层-62层不等，平均总层高为24-25层；超高层的数量占比及价格等可做进一步分析
 
 # 探索性分析
 
-## 变量1的数值描述与图形
+## 武汉二手房总价格分布情况
+```{r price_ttl, echo=FALSE}
+Q1 <- quantile(lj$price_ttl, 0.25, na.rm = TRUE)
+Q3 <- quantile(lj$price_ttl, 0.75, na.rm = TRUE)
+IQR <- Q3 - Q1
+lj_filtered <- lj %>%
+  filter(price_ttl >= (Q1 - 1.5 * IQR) & price_ttl <= (Q3 + 1.5 * IQR))
+
+density_data <- density(lj_filtered$price_ttl)
+peak_value <- max(density_data$y)
+peak_price <- density_data$x[which.max(density_data$y)]
+print(peak_value)
+print(peak_price)
+
+lj_filtered %>%
+  ggplot(aes(x = price_ttl)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "lightblue", color = "black", alpha = 0.7) +
+  geom_density(color = "red", size = 1) +
+  labs(title = "去除异常值后的二手房总价分布", x = "总价 (万元)", y = "密度") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
 
 发现：
 
-- 发现1
+- 发现1:密度曲线峰值对应的总价约为120.16万元，低于总价平均值
 
-- 发现2
+- 发现2：武汉大部分房屋的总价集中在较低的范围，这可能与武汉相较于一线城市（如北京、上海、广州和深圳）人均GDP（经济水平）仍有一定差距有关，潜在买家可能更多地关注中低价位的房源
 
-## 变量2的数值描述与图形
+
+## 分析有购买不同房间数需求的人，不同区域的房屋总价平均水平
+
+```{r property_region, echo=FALSE}
+region_counts <- lj %>%
+  group_by(property_region) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  arrange(desc(count))
+
+top_regions <- region_counts %>%
+  top_n(10, count)
+
+top_regions <- top_regions %>%
+  ungroup()
+
+top_regions %>%
+  kable(caption = "在售小区数量前10的区域") %>%
+  kable_styling(full_width = FALSE, position = "left")
+
+price_mean_summary <- lj %>%
+  filter(property_region %in% top_regions$property_region) %>%
+  group_by(property_region, bedrooms) %>%
+  summarise(price_mean_region = mean(price_ttl, na.rm = TRUE), .groups = 'drop') %>%
+  filter(price_mean_region < 1000) 
+
+ggplot(price_mean_summary, aes(x = property_region, y = price_mean_region, color = property_region)) +
+  geom_point(size = 2) +
+  labs(title = "不同区域房屋总价均值散点图（前10个区域）",
+       x = "区域",
+       y = "均值总价 (万元)",
+       color = "区域") +
+  theme_minimal() +
+  facet_wrap(~ bedrooms,nrow = 3) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
 
 发现：
 
-- 发现1
+- 发现1：武汉在售小区数量前10的区域主要集中在郊区，位置偏远；其中光谷东因软件开发公司较多，
+珞狮南路为武昌区的市中心，房源交易频繁
 
-- 发现2
+- 发现2：针对这些热门区域，出于不同需求或家庭选择 
 
-## 变量...的数值描述与图形
+房间数为1的且总价平均水平较低的可选区域有：白沙洲，王家湾，青山 
+
+房间数为2的且总价平均水平较低的可选区域有：盘龙城，金银湖，青山
+
+房间数为3的且总价平均水平较低的可选区域有：青山，金银湖，四新
+
+房间数为4的且总价平均水平较低的可选区域有：盘龙城，金银湖，白沙洲
+
+房间数为5的且总价平均水平较低的可选区域有：青山
+
+房间数为6的在售区域有盘龙城
+
+（房间数为7的极少且价格在1000万以上，这里不做讨论）
+
+
+## 武汉二手房不同层高房源占比
+
+```{r property_t_height, echo=FALSE}
+summary <- lj %>%
+  summarise(
+    total_count = n(),
+    above_30_count = sum(property_t_height > 30, na.rm = TRUE),
+    between_7_and_30_count = sum(property_t_height >= 7 & property_t_height <= 30, na.rm = TRUE),
+    below_7_count = sum(property_t_height < 7, na.rm = TRUE),
+    
+    above_30_ratio = above_30_count / total_count,
+    between_7_and_30_ratio = between_7_and_30_count / total_count,
+    below_7_ratio = below_7_count / total_count
+  )
+print(summary)
+```
+
+发现：武汉二手中7-30的中高层房源占比最高；其次是30层以上的超高层，占比接近中高层数量；7层以下房源较少，不足9%
+
+
+## 不同层高房屋单价水平散点图及回归分析
+
+```{r mean_price_by_height, echo=FALSE}
+mean_price_by_height <- lj %>%
+  group_by(property_t_height) %>%
+  summarise(mean_price_sqm = mean(price_sqm, na.rm = TRUE), .groups = 'drop')
+
+ggplot(mean_price_by_height, aes(x = property_t_height, y = mean_price_sqm)) +
+  geom_point(size = 2, color = "blue") +  
+  geom_smooth(method = "loess", color = "red", se = FALSE) +  
+  labs(title = "不同层高房屋单价水平散点图及回归分析",
+       x = "楼栋总层数",
+       y = "均值单价 (元/平方米)") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
 
 发现：
 
-- 发现1
+- 发现1:约28层以上的超高层平均单价普遍比中低楼层高，但楼层在约48层以上时单价呈下降趋势。
+超高层单价贵的原因可能有：
+（1）地段价值：超高层住宅往往位于城市的核心区域或繁华地带，地段价值较高
+（2）经济价值：属于商住两用房，经济价值高
+- 发现2：楼层处在10-20层之间的平均单价低于10层以下和20层以上的房屋单价平均水平，
+资金有限、追求性价比的买房人群更适宜选择层高10-20的楼房
 
-- 发现2
-
-## 探索问题1
-
-发现：
-
-- 发现1
-
-- 发现2
-
-## 探索问题2
-
-发现：
-
-- 发现1
-
-- 发现2
-
-## 探索问题3
-
-发现：
-
-- 发现1
-
-- 发现2
 
 ---
 
 # 发现总结
+1.武汉2023年二手房总价均值是155.9万，单价均值在15148元。武汉大部分房屋的总价集中在较低的范围，这可能与武汉相较于一线城市（如北京、上海、广州和深圳）人均GDP（经济水平）仍有一定差距有关，潜在买家可能更多地关注中低价位的房源
 
-用1-3段话总结你的发现。
+2.武汉在售小区数量前10的区域主要集中在郊区，位置偏远。针对这些热门区域，出于不同房间数需求或家庭选择，本分析给出了性价比比较高的一些区域推荐
 
+3.武汉二手房中7-30的中高层房源占比最高；其次是30层以上的超高层，占比接近中高层数量；7层以下房源较少，不足9%。
+约28层以上的超高层平均单价普遍比中低楼层高，但楼层在约48层以上时单价呈下降趋势。楼层处在10-20层之间的平均单价低于10层以下和20层以上的房屋单价平均水平，资金有限、追求性价比的买房人群更适宜选择层高10-20的楼房
 
 
